@@ -1,0 +1,129 @@
+mchally@hrn53011:~$ mpicc.openmpi -g -Wall -o mpi_hello mpi_hello.c 
+mchally@hrn53011:~$ mpiexec.openmpi -n 2 valgrind ./mpi_hello
+==27626== Memcheck, a memory error detector
+==27626== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
+==27626== Using Valgrind-3.10.0.SVN and LibVEX; rerun with -h for copyright info
+==27626== Command: ./mpi_hello
+==27626== 
+==27627== Memcheck, a memory error detector
+==27627== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
+==27627== Using Valgrind-3.10.0.SVN and LibVEX; rerun with -h for copyright info
+==27627== Command: ./mpi_hello
+==27627== 
+==27626== Invalid read of size 4
+==27626==    at 0x4F436B0: opal_os_dirpath_create (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EDE4EC: orte_session_dir (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EF19E9: orte_ess_base_app_setup (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x7812940: ??? (in /usr/lib/openmpi/lib/openmpi/mca_ess_env.so)
+==27626==    by 0x4ED1842: orte_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4E91023: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x400B38: main (mpi_hello.c:27)
+==27626==  Address 0x640eab0 is 48 bytes inside a block of size 51 alloc'd
+==27626==    at 0x4C2AB80: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==27626==    by 0x4F43662: opal_os_dirpath_create (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EDE4EC: orte_session_dir (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EF19E9: orte_ess_base_app_setup (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x7812940: ??? (in /usr/lib/openmpi/lib/openmpi/mca_ess_env.so)
+==27626==    by 0x4ED1842: orte_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4E91023: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x400B38: main (mpi_hello.c:27)
+==27626== 
+==27627== Invalid read of size 4
+==27627==    at 0x4F436B0: opal_os_dirpath_create (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EDE4EC: orte_session_dir (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EF19E9: orte_ess_base_app_setup (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x7812940: ??? (in /usr/lib/openmpi/lib/openmpi/mca_ess_env.so)
+==27627==    by 0x4ED1842: orte_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4E91023: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x400B38: main (mpi_hello.c:27)
+==27627==  Address 0x640eab0 is 48 bytes inside a block of size 51 alloc'd
+==27627==    at 0x4C2AB80: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==27627==    by 0x4F43662: opal_os_dirpath_create (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EDE4EC: orte_session_dir (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EF19E9: orte_ess_base_app_setup (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x7812940: ??? (in /usr/lib/openmpi/lib/openmpi/mca_ess_env.so)
+==27627==    by 0x4ED1842: orte_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4E91023: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x400B38: main (mpi_hello.c:27)
+==27627== 
+==27626== Syscall param writev(vector[...]) points to uninitialised byte(s)
+==27626==    at 0x54C7417: writev (writev.c:49)
+==27626==    by 0x7E28062: mca_oob_tcp_msg_send_handler (in /usr/lib/openmpi/lib/openmpi/mca_oob_tcp.so)
+==27626==    by 0x7E29225: mca_oob_tcp_peer_send (in /usr/lib/openmpi/lib/openmpi/mca_oob_tcp.so)
+==27626==    by 0x7E2D0A5: mca_oob_tcp_send_nb (in /usr/lib/openmpi/lib/openmpi/mca_oob_tcp.so)
+==27626==    by 0x7C1CDE1: orte_rml_oob_send (in /usr/lib/openmpi/lib/openmpi/mca_rml_oob.so)
+==27626==    by 0x7C1D403: orte_rml_oob_send_buffer (in /usr/lib/openmpi/lib/openmpi/mca_rml_oob.so)
+==27626==    by 0x8238A0E: ??? (in /usr/lib/openmpi/lib/openmpi/mca_grpcomm_bad.so)
+==27626==    by 0x4E914EE: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627== Syscall param writev(vector[...]) points to uninitialised byte(s)
+==27627==    at 0x54C7417: writev (writev.c:49)
+==27627==    by 0x7E28062: mca_oob_tcp_msg_send_handler (in /usr/lib/openmpi/lib/openmpi/mca_oob_tcp.so)
+==27627==    by 0x7E29225: mca_oob_tcp_peer_send (in /usr/lib/openmpi/lib/openmpi/mca_oob_tcp.so)
+==27627==    by 0x7E2D0A5: mca_oob_tcp_send_nb (in /usr/lib/openmpi/lib/openmpi/mca_oob_tcp.so)
+==27627==    by 0x7C1CDE1: orte_rml_oob_send (in /usr/lib/openmpi/lib/openmpi/mca_rml_oob.so)
+==27627==    by 0x7C1D403: orte_rml_oob_send_buffer (in /usr/lib/openmpi/lib/openmpi/mca_rml_oob.so)
+==27627==    by 0x8238A0E: ??? (in /usr/lib/openmpi/lib/openmpi/mca_grpcomm_bad.so)
+==27627==    by 0x4E914EE: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x400B38: main (mpi_hello.c:27)
+==27627==  Address 0x65aadf1 is 161 bytes inside a block of size 256 alloc'd
+==27627==    at 0x4C2CE8E: realloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==27627==    by 0x4F18EF9: opal_dss_buffer_extend (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4F192AD: opal_dss_copy_payload (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EF5DAD: orte_grpcomm_base_pack_modex_entries (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x82388EF: ??? (in /usr/lib/openmpi/lib/openmpi/mca_grpcomm_bad.so)
+==27627==    by 0x4E914EE: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27627==    by 0x400B38: main (mpi_hello.c:27)
+==27627== 
+==27626==    by 0x400B38: main (mpi_hello.c:27)
+==27626==  Address 0x65aadf1 is 161 bytes inside a block of size 256 alloc'd
+==27626==    at 0x4C2CE8E: realloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==27626==    by 0x4F18EF9: opal_dss_buffer_extend (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4F192AD: opal_dss_copy_payload (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EF5DAD: orte_grpcomm_base_pack_modex_entries (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x82388EF: ??? (in /usr/lib/openmpi/lib/openmpi/mca_grpcomm_bad.so)
+==27626==    by 0x4E914EE: ompi_mpi_init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x4EA8617: PMPI_Init (in /usr/lib/openmpi/lib/libmpi.so.1.0.8)
+==27626==    by 0x400B38: main (mpi_hello.c:27)
+==27626== 
+Greetings from process 0 of 2, running on hrn53011
+Greetings from process 1 of 2, running on hrn53011
+==27627== 
+==27627== HEAP SUMMARY:
+==27627==     in use at exit: 286,039 bytes in 1,431 blocks
+==27627==   total heap usage: 7,618 allocs, 6,187 frees, 13,161,291 bytes allocated
+==27627== 
+==27626== 
+==27626== HEAP SUMMARY:
+==27626==     in use at exit: 286,039 bytes in 1,431 blocks
+==27626==   total heap usage: 7,623 allocs, 6,192 frees, 13,220,682 bytes allocated
+==27626== 
+==27627== LEAK SUMMARY:
+==27627==    definitely lost: 51,132 bytes in 69 blocks
+==27627==    indirectly lost: 14,378 bytes in 39 blocks
+==27627==      possibly lost: 0 bytes in 0 blocks
+==27627==    still reachable: 220,529 bytes in 1,323 blocks
+==27627==         suppressed: 0 bytes in 0 blocks
+==27627== Rerun with --leak-check=full to see details of leaked memory
+==27627== 
+==27627== For counts of detected and suppressed errors, rerun with: -v
+==27627== Use --track-origins=yes to see where uninitialised values come from
+==27627== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 0 from 0)
+==27626== LEAK SUMMARY:
+==27626==    definitely lost: 51,132 bytes in 69 blocks
+==27626==    indirectly lost: 14,378 bytes in 39 blocks
+==27626==      possibly lost: 0 bytes in 0 blocks
+==27626==    still reachable: 220,529 bytes in 1,323 blocks
+==27626==         suppressed: 0 bytes in 0 blocks
+==27626== Rerun with --leak-check=full to see details of leaked memory
+==27626== 
+==27626== For counts of detected and suppressed errors, rerun with: -v
+==27626== Use --track-origins=yes to see where uninitialised values come from
+==27626== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 0 from 0)
+mchally@hrn53011:~$ 

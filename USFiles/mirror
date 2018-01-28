@@ -1,0 +1,360 @@
+##############################################################################################
+# googlescraper.py:  Google Sites Backup Tool
+# $Id: googlescrape.py 14 2009-03-07 00:51:29Z cbean $
+#
+# Copyright (c) 2009, Colin Bean
+# All Rights Reserved
+# 
+# Redistribution and use in source and binary forms, with or without 
+# modification, are permitted provided that the following conditions are met:
+# 
+#    1. Redistributions of source code must retain the above copyright 
+#       notice, this list of conditions and the following disclaimer.
+#    2. Redistributions in binary form must reproduce the above copyright 
+#       notice, this list of conditions and the following disclaimer in 
+#       the documentation and/or other materials provided with the distribution.
+#    3. The name of the author may not be used to endorse or promote products 
+#       derived from this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY 
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
+# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR 
+# TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+###############################################################################################
+
+import os
+import sys
+import re 
+import cPickle as pickle
+import logging
+import getpass
+import cgi
+
+import mechanize
+import BeautifulSoup
+
+from optparse import OptionParser
+
+
+class Scraper(object):
+    """Scrapes a single instance of a google site"""
+    def __init__(self, sitename, savepath='.', username=None, password=None, domain="cs.usfca.edu", 
+                       verbose = False, quiet = False, snippets=True, mirror=False, versions=False
+                 ):
+        
+        self.savepath = savepath
+        self.sitename = sitename
+        self.domain = domain
+        self.username = username
+        self.password = password
+        self.quiet = quiet
+        self.verbose = verbose
+        self.snippets = snippets
+        self.mirror = mirror
+        self.versions = versions
+
+        if self.mirror:
+            self.snippets = False
+            loglevel = logging.DEBUG
+        else:
+            loglevel = logging.DEBUG
+            
+        if self.quiet:
+            self.verbose = False
+        
+        self.savedir = os.path.join(self.savepath, self.domain, self.sitename)
+        
+        self.browser = mechanize.Browser()
+        
+        self.processed = {}
+        
+        try:
+            os.stat(self.savedir)
+        except OSError, e:
+            os.makedirs(self.savedir)
+        
+        
+        
+        logging.basicConfig(
+            level=loglevel,
+            filename=os.path.join(self.savedir, '%s.log'%self.sitename),
+            format='%(message)s'
+        )
+    
+    def login(self, user, passwd):
+        """Log into a site.  Assumes the browser is pointing to an auth page."""
+        self.browser.select_form(nr=0)
+        self.browser['Email'] = user
+        self.browser['Passwd'] = passwd
+        self.browser.submit()
+    
+    def crawl(self):
+        """Optionally sign in, and being crawling site"""
+        self.root_url = "https://sites.google.com/a/%s/%s/"%(self.domain, self.sitename)
+        self.root_uri = "/a/%s/%s/"%(self.domain, self.sitename)
+        
+        start_url = "https://sites.google.com/a/%s/%s/system/app/pages/sitemap/list?offset=150"%(self.domain, self.sitename)
+        
+        #We always need to authenticate for versions
+        if self.versions and not self.username:
+            print "Authorization required"
+            print "Username: ",
+            self.username = sys.stdin.readline()
+        
+        if self.username:
+            if not self.password:
+                self.password = getpass.getpass("Password for %s: "%self.username.strip())
+            #Force login for public sites
+            self.browser.open('https://www.google.com/a/%s/ServiceLogin2?continue=http%%3A%%2F%%2Fsites.google.com%%2Fa%%2F%s%%2F%s%%2F&service=jotspot&passive=true&ul=1'%(self.domain, self.domain, self.sitename))
+            self.login(self.username, self.password)
+        else:
+            self.browser.open(start_url)
+        
+        while self.browser.geturl().startswith('https://www.google.com/a/cs.usfca.edu/ServiceLogin2') or \
+              self.browser.geturl().startswith('https://www.google.com/a/cs.usfca.edu/LoginAction2'):
+            print "Authorization required"
+            if not self.username:
+                print "Username: ",
+                self.username = sys.stdin.readline()
+            passwd = getpass.getpass("Password for %s: "%self.username.strip())
+            self.login(self.username, passwd)
+        
+        if not self.quiet:
+            print "Crawling"
+        self.process_url(start_url)
+        
+    def make_dir(self, url):
+        """Makes a local directory based on a URL path"""
+        if url.startswith('https://'):
+            url = url.replace(self.root_url, '')
+        else:
+            url = url.replace(self.root_uri, '')
+            
+        path, name = os.path.split(url)
+        dpath = os.path.join(self.savedir, path)
+    
+        #Make sure we don't write outside of our current dir.
+        assert dpath.startswith(self.savedir)
+        
+        #For versioning, create clean filename from query string information
+        if url.count('system/app/pages/revisions') > 0 or url.count('system/app/pages/compare') > 0 :
+            base, qs = name.split('?')
+            qs_dict = cgi.parse_qs(qs)
+            if qs_dict.has_key('target'):
+                base += '_' + qs_dict['target'][0]
+            if qs_dict.has_key('rev1'):
+                base += '_' + qs_dict['rev1'][0]
+            name = base
+        
+        try:
+            os.stat(dpath)
+        except OSError, e:
+            os.makedirs(dpath)
+        return dpath, name
+        
+    def process_url(self, url):
+        """Open a single URL, follow relevant links, save full version, local resource, and content snippet"""        
+        if self.verbose:
+            print "Fetching: ", url
+        try:
+            response = self.browser.open(url)
+            code = response.code
+            data = response.read()
+            url = url.replace('https://sites.google.com', '')            
+        except (mechanize.HTTPError, mechanize.URLError), e:
+            self.processed[url] = None
+            logging.error("Failed to fetch %s:\n%s", url, e)
+            self.browser.back()
+            return
+        
+        try:
+            savedir, name = self.make_dir(url)
+        except AssertionError, e:
+            return
+        
+        if self.browser.viewing_html():
+            if not name:
+                name = 'index.orig'
+            else:
+                name += '.orig'
+            
+            self.processed[url] = os.path.join(savedir, name)
+            #print self.processed[url]
+            s = BeautifulSoup.BeautifulSoup(data)
+            links = []
+            
+            if self.versions:
+                links += s.findAll('a', {'id':'version-history-link'})
+            
+            #Get rid of toolbar (so we don't follow version links)
+            removedivs = []
+            if not self.versions:
+                removedivs += s.findAll('div', {'id':'goog-ws-page-tools-div'})
+            removedivs += s.findAll('div', {'class':re.compile(r'goog-toolbar-button *')})                
+            removedivs += s.findAll('div', {'class':re.compile(r'goog-toolbar-menu-buttons*')})
+            [d.extract() for d in removedivs]
+            
+            links += s.findAll('a', href=re.compile("^(https://sites.google.com)?/a/%s/%s/*"%(self.domain, self.sitename)))                        
+            links = [l for l in links if l['href'].count('/system/app/pages/admin/')==0]
+            
+            #(versions) Don't follow 'compare' links unless we're on the revisions list
+            if url.count('/system/app/pages/revisions') == 0:
+                links = [l for l in links if l['href'].count('/system/app/pages/compare')==0]
+            
+            link_set = set( [l['href'] for l in links] )
+            
+            link_set |= set( [l['href'] for l in s.findAll('link') if l['href']] )
+            i_src = set( [l['src'] for l in s.findAll('img') if l.has_key('src') and l['src']] )
+            #print "Images", i_src
+            link_set |= i_src
+            #print link_set
+            
+            os.path.join(savedir, name)
+            
+            f = file(os.path.join(savedir, name), 'w')
+            f.write(str(s))
+            f.close()
+            
+            for l in link_set:
+                if not self.processed.has_key(l.replace('https://sites.google.com', '')):
+                    self.process_url(l)
+                    
+        else:
+            name = os.path.join(savedir, name).split("?")[0]
+            self.processed[url] = name
+            f = file(name, 'w')
+            f.write(data)
+            f.close()
+            self.browser.back()  
+        
+    def save_urls(self):
+        """Save our URL mappings"""
+        f = file( os.path.join(self.savedir, 'links.db'), 'w' )
+        pickle.dump(self.processed, f)
+        f.close()
+        
+    def load_urls(self):
+        """Load existing URL mappings"""
+        f = file( os.path.join(self.savedir, 'links.db'))
+        self.processed = pickle.load(f)
+        f.close()
+        
+    def rewrite_rel(self, root, target):
+        """Rewrite target as a relative path from root"""
+        t_name, t_ext = os.path.splitext(target)
+        pre = os.path.commonprefix( (root, os.path.split(t_name)[0]) )
+        #pre = os.path.commonprefix( (os.path.split(root)[0], os.path.split(t_name)[0]) )
+        t_name = t_name.replace(pre, '', 1).lstrip('/')                                
+        c_root = root.replace(pre, '', 1).lstrip('/')                                
+        
+        c_root = c_root.split('/')
+        
+        if c_root:
+            #c_root = os.path.join(*['..' for i in c_root] )
+            
+            #Fix sitemap links: Don't go up one directory for empty prefix
+            updirs = ['..' for i in c_root if i]
+            if updirs:
+                c_root = os.path.join(*updirs )
+            else:
+                c_root = ''
+            t_name = os.path.join(c_root, t_name)
+
+        if t_ext == '.orig':
+            t_ext = '.html'
+        return t_name + t_ext
+        
+    def rewrite_links(self):
+        """Rewrite links and clean up content"""
+        if not self.quiet:
+            print "Rewriting Links"
+        
+        for root, dirs, files in os.walk(self.savedir):
+            for pth in files:
+                name, ext = os.path.splitext(pth)
+                if ext == '.orig':
+                    if self.verbose:
+                        print "Rewriting ", name
+                        
+                    f = file(os.path.join(root, pth))
+                    s = BeautifulSoup.BeautifulSoup(f.read())
+                    f.close()
+                
+                    links = s.findAll('a', href=re.compile("^(https://sites.google.com)?/a/%s/%s/*"%(self.domain, self.sitename)))
+                    links += [l for l in s.findAll('link') if l['href']]
+                    images = [l for l in s.findAll('img') if l.has_key('src') and l['src']]
+
+                    for l in links:
+                        try:
+                            l['href'] = l['href'].replace('https://sites.google.com', '')
+                            l['href'] = self.rewrite_rel(root, self.processed[l['href']])
+                        except (KeyError, AttributeError), e:
+                            logging.error("Error rewriting %s",l['href'])
+
+                    for i in images:
+                        try:
+                            i['src'] = i['src'].replace('https://sites.google.com', '')
+                            i['src'] = self.rewrite_rel(root, self.processed[i['src']]).split('?')[0]
+                        except (KeyError, AttributeError), e:
+                            logging.error("Error rewriting %s",i['src'])
+
+                    #Get rid of top links, edit links
+                    removedivs = s.findAll('div', {'id':'gbar'})
+                    removedivs += s.findAll('div', {'class':'goog-ws-account'})
+                    removedivs += s.findAll('div', {'class':re.compile(r'^goog-ws-edit-sidebar*')})
+                    [d.extract() for d in removedivs]
+                    
+                    #USFCS: Rewrite search target
+                    #searchdiv = s.findAll('div', {'class':'goog-ws-search'})[0]
+                    try:
+                        searchform = s.findAll('form', {'id':'sites-searchbox-form'})[0]
+                        searchdiv = searchform.parent
+                        searchdiv.form.extract()
+                        searchdiv.insert(0, BeautifulSoup.BeautifulSoup("""<form id="sites-searchbox-form" action="http://www.google.com/search" method="get">
+                            <input type="hidden" name="q" value="site:www.cs.usfca.edu"/>
+                            <input type="text" name="q" size="20" />
+                            <input type="submit" id="jot-ui-searchButton" value="Search Site" style="margin-top:-1px" />
+                        </form>"""))
+                    except IndexError, e:
+                        pass
+
+                    #Save new content with UTF-8 hint
+                    f = file(os.path.join(root, name + '.html'), 'w')
+                    f.write('<?xml version="1.0" encoding="utf-8"?>\n' + s.prettify())
+                    f.close()
+                    
+                    
+                    if self.snippets:
+                        #Save snippet of content only
+                        content_snip = s.find('div', id='jot-main')
+
+                        f = file(os.path.join(root, name + '.snip'), 'w')
+                        f.write(content_snip.prettify())
+                        f.close()
+                        
+                    if self.mirror:
+                        #Get rid of original page
+                        os.remove( os.path.join(root, pth) )
+
+if __name__=='__main__':
+
+    #s = Scraper('usfcs', mirror=False, savepath='.', verbose=True, snippets=False)
+    s = Scraper('usfcs', mirror=True, savepath='.', verbose=False)
+
+    try:
+        s.crawl()
+        s.save_urls()
+        s.load_urls()
+        s.rewrite_links()
+        #if not s.mirror:
+        #    s.save_urls()
+        #s.rewrite_links()
+    except KeyboardInterrupt, e:
+        s.save_urls()
+    

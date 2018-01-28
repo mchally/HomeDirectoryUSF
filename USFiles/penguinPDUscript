@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+
+import sys, getopt, telnetlib, time
+
+h1 = 'pdu-penguin1'
+h2 = 'pdu-penguin2'
+user = 'device\r\n'
+pswd = 'apc\r\n'
+
+CR='\r\n'
+ONE='1\r\n'
+TWO='2\r\n'
+THREE='3\r\n'
+YES='YES\r\n'
+FOUR='4\r\n'
+ESCAPE='\x1b'
+
+kmap = { 
+1: (h1, 23), 2: (h2, 23), 3: (h1, 22), 4: (h2, 22), 5: (h1, 21), 
+6: (h2, 21), 7: (h1, 20), 8: (h2, 20), 9: (h1, 19), 10: (h2, 19),
+
+11: (h1, 18), 12: (h2, 18), 13: (h1, 15), 14: (h2, 15), 15: (h1, 14), 
+16: (h2, 14), 17: (h1, 13), 18: (h2, 13), 19: (h1, 12), 20: (h2, 12),
+
+21: (h1, 11), 22: (h2, 11), 23: (h1, 10), 24: (h2, 10), 
+}
+
+verbose = False
+
+try:
+	opts,args = getopt.getopt(sys.argv[1:], 'vt')
+except getopt.GetoptError, e:
+	print 'ERROR:', e
+	sys.exit(1)
+
+for o,a in opts:
+	if o == '-v': verbose = True
+	if o == '-t': CONFIRM = '\r\n'
+
+if len(args) < 1:
+	print 'usage: %s <node number>' % sys.argv[0]
+	print '  e.g. %s 3' % sys.argv[0]
+	sys.exit(1)
+
+try:
+	host,outlet = kmap[int(args[0])]
+except KeyError:
+	print 'ERROR: invalid argument'
+	sys.exit(1)
+
+print 'Please wait...'
+
+pdu = telnetlib.Telnet(host)
+
+x = pdu.read_until('User Name : ')
+if verbose: print x
+pdu.write(user)
+x = pdu.read_until('Password  : ')
+if verbose: print x
+pdu.write(pswd)
+
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write(ONE)
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write(TWO)
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write(ONE)
+pdu.write(CR)
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write('%d\r\n' % outlet)
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write(ONE)
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write(THREE)
+x = pdu.read_until(' : ')
+if verbose: print x
+
+pdu.write(YES)
+pdu.write(CR)
+x = pdu.read_until('> ')
+if verbose: print x
+
+pdu.write(ESCAPE)
+x = pdu.read_until('> ')
+if verbose: print x
+pdu.write(ESCAPE)
+pdu.write(CR)
+x = pdu.read_until('> ')
+if verbose: print x
+pdu.write(ESCAPE)
+x = pdu.read_until('> ')
+if verbose: print x
+pdu.write(ESCAPE)
+x = pdu.read_until('> ')
+if verbose: print x
+pdu.write(ESCAPE)
+x = pdu.read_until('> ')
+if verbose: print x
+pdu.write(FOUR)
+
+if verbose: print pdu.read_all()
+
+pdu.close()
+
+print 'penguin%02d has been rebooted.' % int(args[0])
+print 'Please wait a minute for the machine to boot up.'
+
